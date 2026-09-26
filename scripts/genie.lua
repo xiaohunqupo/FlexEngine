@@ -10,6 +10,12 @@ PROJECT_DIR = path.getabsolute("..")
 SOURCE_DIR = path.join(PROJECT_DIR, "FlexEngine/")
 DEPENDENCIES_DIR = path.join(SOURCE_DIR, "dependencies/")
 
+newoption {
+	trigger = "windows-sdk",
+	value = "version",
+	description = "Windows SDK version to target (e.g. 10.0.26100.0), defaults to the latest installed"
+}
+
 solution "Flex"
 	configurations {
 		"Debug",
@@ -25,7 +31,7 @@ solution "Flex"
 
 	location "../build/"
 	objdir "../build/"
-	windowstargetplatformversion "10.0"
+	windowstargetplatformversion(_OPTIONS["windows-sdk"] or "10.0")
 
 -- Put intermediate files under build/Intermediate/config_platform/project
 -- Put binaries under bin/config/project/platform --TODO: Really? confirm
@@ -122,11 +128,9 @@ configuration {}
 		path.join(DEPENDENCIES_DIR, "imgui"),
 		path.join(DEPENDENCIES_DIR, "vulkan/include"),
 		path.join(DEPENDENCIES_DIR, "bullet/src"),
-		path.join(DEPENDENCIES_DIR, "bullet/examples"),
 		path.join(DEPENDENCIES_DIR, "openAL/include"),
 		path.join(DEPENDENCIES_DIR, "freetype/include"),
 		path.join(DEPENDENCIES_DIR, "shaderc/libshaderc/include"),
-		path.join(DEPENDENCIES_DIR, "shaderc/libshaderc_spvc/include"),
 		path.join(DEPENDENCIES_DIR, "shaderc/libshaderc_util/include"),
 		DEPENDENCIES_DIR,
 	}
@@ -169,9 +173,6 @@ project "Flex"
 			"-pthread", -- For pthread_create
 			"-L/usr/lib64/",
 			"-ldl", -- For dlopen, etc.
-			"-L/usr/lib64/",
-			"-L/lib/x86_64-linux-gnu/", -- for bzip2
-			"-lbz2",
 		}
 		buildoptions {
 			"-Wfatal-errors",
@@ -206,7 +207,7 @@ project "Flex"
 		-- Debug-only
 		configuration { "vs*", "Debug" }
 			links { "BulletCollision_Debug", "BulletDynamics_Debug", "LinearMath_Debug", "freetype", "shaderc_combined" }
-		configuration { "vs*", "Debug" }
+		configuration { "vs*", "Sanitize" }
 			links { "BulletCollision_Debug", "BulletDynamics_Debug", "LinearMath_Debug", "freetype", "shaderc_combined" }
 		configuration { "vs*", "Profile" }
 			links { "BulletCollision", "BulletDynamics", "LinearMath", "freetype" }
@@ -216,7 +217,9 @@ project "Flex"
 			links { "BulletCollision", "BulletDynamics", "LinearMath", "freetype" }
 	-- linux
 		configuration "linux*"
-			links { "glfw3", "openal", "BulletDynamics", "BulletCollision", "LinearMath", "freetype", "X11", "png", "z", "shaderc_combined", "uuid" }
+			links { "glfw3", "openal", "BulletDynamics", "BulletCollision", "LinearMath", "freetype", "X11", "uuid" }
+		configuration { "linux*", "Debug or Sanitize" }
+			links { "shaderc_combined" }
 configuration {}
 
 --Source files
@@ -237,7 +240,14 @@ files {
 removefiles {
 }
 
+-- Every source file includes stdafx.hpp first
+if string.startswith(_ACTION or "", "vs") then
+	pchheader "stdafx.hpp"
+	pchsource(path.join(SOURCE_DIR, "src/stdafx.cpp"))
+end
+
 -- Don't use pre-compiled header for the following files
 nopch {
 	path.join(DEPENDENCIES_DIR, "imgui/**.cpp"),
+	path.join(SOURCE_DIR, "src/ThirdParty/**.c"),
 }
